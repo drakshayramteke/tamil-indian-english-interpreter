@@ -1,11 +1,11 @@
 {
-  "name": "Tamil \u2194 Indian English Interpreter \u2014 Free V3.1",
+  "name": "Tamil \u2194 Indian English Interpreter \u2014 V4",
   "short_name": "Tamil Interpreter",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#f3f4f6",
   "theme_color": "#111111",
-  "description": "Free Tamil \u2194 Indian English voice interpreter.",
+  "description": "Free Tamil \u2194 Indian English conversation interpreter.",
   "icons": [
     {
       "src": "icons/icon-192.png",
