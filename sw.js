@@ -1,1 +1,1 @@
-const CACHE="tamil-interpreter-free-v31";self.addEventListener("install",e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(["./","./index.html","./manifest.webmanifest"]))));self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
+const C="tamil-interpreter-v4";self.addEventListener("install",e=>e.waitUntil(caches.open(C).then(c=>c.addAll(["./","./index.html","./manifest.webmanifest"]))));self.addEventListener("activate",e=>e.waitUntil(self.clients.claim()));
