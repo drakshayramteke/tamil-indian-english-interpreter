@@ -1,181 +1,24 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#111">
-<link rel="manifest" href="manifest.webmanifest">
-<title>Tamil ↔ Indian English Interpreter — Free V3.1</title>
-<style>
-*{box-sizing:border-box}body{margin:0;background:#f3f4f6;color:#111;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
-.app{max-width:760px;margin:auto;padding:17px 14px 30px}.head{display:flex;justify-content:space-between;align-items:center}
-h1{font-size:24px;margin:0}.sub{color:#666;margin:3px 0 15px;font-size:14px}
-.card{background:#fff;border-radius:22px;padding:18px;margin:12px 0;box-shadow:0 4px 18px #0001}
-.mode{display:grid;grid-template-columns:1fr 1fr;gap:9px}.mode button{padding:14px;border:0;border-radius:13px;background:#eee;font-weight:750;font-size:15px}.mode .active{background:#111;color:#fff}
-.start{width:100%;padding:20px;border:0;border-radius:17px;background:#111;color:#fff;font-size:19px;font-weight:800;margin-top:12px}.start.live{background:#b71c1c}
-.status{text-align:center;color:#666;font-size:13px;margin-top:10px;min-height:20px}.badge{background:#eee;padding:7px 10px;border-radius:99px;font-size:12px;font-weight:700}
-.label{font-size:12px;color:#777;text-transform:uppercase;letter-spacing:.08em}.big{font-size:21px;line-height:1.45;min-height:55px;margin-top:8px}.trans{font-size:25px;line-height:1.42;font-weight:650;min-height:70px;margin-top:8px}
-.row{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}.btn{border:0;background:#eee;border-radius:12px;padding:11px 14px;font-weight:700}
-.history{max-height:330px;overflow:auto}.item{padding:12px 0;border-bottom:1px solid #eee}.to{font-size:18px;font-weight:650;margin-top:5px}.hint,.note{color:#777;font-size:13px;line-height:1.5}
-.progress{height:8px;background:#eee;border-radius:10px;overflow:hidden;margin-top:10px;display:none}.bar{height:100%;width:0;background:#111;transition:width .2s}
-</style>
-</head>
-<body>
-<div class="app">
-<div class="head"><div><h1>Live Interpreter</h1><p class="sub">Free V3.1 • Tamil ↔ Indian English</p></div><span id="badge" class="badge">READY</span></div>
+Live Interpreter
+Free V4 • Conversation Mode
+READY
+🔄 Conversation
+↔️ Manual
+First speaker
+The app alternates languages after each turn.
+🇬🇧 English🇮🇳 Tamil
+🎙️ Start conversation
+No OpenAI API, paid AI service, or API key.
+CURRENT TURN
+Ready
+Start when both people are ready.
 
-<div class="card">
-<div class="label">Choose direction</div>
-<div class="mode" style="margin-top:8px">
-<button id="en" class="active">🇬🇧 English → Tamil</button>
-<button id="ta">🇮🇳 Tamil → English</button>
-</div>
-<button id="start" class="start">🎙️ Start interpreter</button>
-<div id="status" class="status">Free translation • no API key • no credit card.</div>
-<div class="progress" id="progress"><div class="bar" id="bar"></div></div>
-</div>
-
-<div class="card">
-<div class="label">You said</div><div id="src" class="big">—</div>
-<div class="label" style="margin-top:17px">Translation</div><div id="dst" class="trans">—</div>
-<div class="row"><button class="btn" id="replay">🔊 Replay</button><button class="btn" id="clear">Clear</button></div>
-</div>
-
-<div class="card">
-<div class="label">Conversation</div>
-<div id="history" class="history"><div class="hint">Your conversation will appear here.</div></div>
-</div>
-
-<div class="card note">
-<strong>How V3.1 translates:</strong> On supported desktop Chrome it uses Chrome's on-device Translator API, which supports Tamil and keeps translation on-device after the model is downloaded. On Android, it falls back to a local NLLB translation model downloaded to the browser. No OpenAI API or paid translation account is used.
-</div>
-</div>
-
-<script type="module">
-import { pipeline } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2/+esm";
-
-let dir="en-ta",rec=null,running=false,last="",lastLang="ta-IN",restartTimer=null;
-let nllb=null,loading=false;
-const $=id=>document.getElementById(id);
-const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-
-function status(x){$("status").textContent=x}
-function setDir(d){
- if(running) stop();
- dir=d;$("en").classList.toggle("active",d==="en-ta");$("ta").classList.toggle("active",d==="ta-en");
- status(d==="en-ta"?"English → Tamil":"Tamil → Indian English");
-}
-$("en").onclick=()=>setDir("en-ta");$("ta").onclick=()=>setDir("ta-en");
-
-function getVoice(lang){
- const voices=speechSynthesis.getVoices();
- const exact=voices.find(v=>v.lang.toLowerCase()===lang.toLowerCase());
- if(exact)return exact;
- return voices.find(v=>v.lang.toLowerCase().startsWith(lang.split("-")[0]))||null;
-}
-function speak(text,lang){
- if(!text)return;
- speechSynthesis.cancel();
- const u=new SpeechSynthesisUtterance(text);u.lang=lang;u.rate=.92;
- const v=getVoice(lang);if(v)u.voice=v;
- speechSynthesis.speak(u);
-}
-function esc(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
-function addHistory(a,b){
- const h=$("history");if(h.querySelector(".hint"))h.innerHTML="";
- const x=document.createElement("div");x.className="item";
- x.innerHTML="<div>"+(dir==="en-ta"?"🇬🇧 ":"🇮🇳 ")+esc(a)+"</div><div class='to'>→ "+esc(b)+"</div>";
- h.prepend(x);
-}
-function setProgress(show,pct=0){
- $("progress").style.display=show?"block":"none";$("bar").style.width=pct+"%";
-}
-
-async function chromeTranslate(text){
- if(!("Translator" in self)) return null;
- const source=dir==="en-ta"?"en":"ta",target=dir==="en-ta"?"ta":"en";
- try{
-   const avail=await Translator.availability({sourceLanguage:source,targetLanguage:target});
-   if(avail==="unavailable")return null;
-   status(avail==="downloadable"?"Downloading free on-device translation model…":"Translating on-device…");
-   const translator=await Translator.create({
-     sourceLanguage:source,targetLanguage:target,
-     monitor(m){m.addEventListener("downloadprogress",e=>setProgress(true,Math.round(e.loaded*100)))}
-   });
-   setProgress(false);
-   return await translator.translate(text);
- }catch(e){setProgress(false);return null}
-}
-
-async function nllbTranslate(text){
- if(!nllb){
-   loading=true;setProgress(true,0);status("Preparing free offline translation model (first time only)…");
-   nllb=await pipeline("translation","Xenova/nllb-200-distilled-600M",{
-     progress_callback:p=>{
-       if(p?.progress!=null)setProgress(true,Math.max(0,Math.min(100,Math.round(p.progress))));
-     }
-   });
-   loading=false;setProgress(false);
- }
- const src=dir==="en-ta"?"eng_Latn":"tam_Taml", tgt=dir==="en-ta"?"tam_Taml":"eng_Latn";
- const result=await nllb(text,{src_lang:src,tgt_lang:tgt});
- return result?.[0]?.translation_text||"";
-}
-
-async function translate(text){
- const local=await chromeTranslate(text);
- if(local)return local;
- return await nllbTranslate(text);
-}
-
-function start(){
- if(!SR){status("Speech recognition is not available in this browser. Use Chrome.");return}
- if(running){stop();return}
- running=true;$("badge").textContent="LISTENING";$("start").classList.add("live");$("start").textContent="⏹ Stop interpreter";
- createRecognition();
-}
-function createRecognition(){
- if(!running)return;
- rec=new SR();rec.lang=dir==="en-ta"?"en-IN":"ta-IN";rec.interimResults=true;rec.continuous=false;
- let finalText="";
- status(dir==="en-ta"?"Listening for Indian English…":"தமிழ் கேட்கிறது…");
- rec.onresult=e=>{
-   let interim="";
-   for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)finalText+=t;else interim+=t}
-   $("src").textContent=(finalText+interim).trim()||"…";
- };
- rec.onerror=e=>{
-   if(!running)return;
-   if(e.error==="not-allowed"){status("Microphone blocked. Chrome → Site settings → Microphone → Allow.");stop()}
-   else if(e.error!=="no-speech")status("Recognition: "+e.error);
- };
- rec.onend=async()=>{
-   if(!running)return;
-   const text=finalText.trim();
-   if(text){
-     try{
-       const out=await translate(text);
-       last=out;lastLang=dir==="en-ta"?"ta-IN":"en-IN";
-       $("src").textContent=text;$("dst").textContent=out||"No translation";
-       if(out){addHistory(text,out);speak(out,lastLang)}
-       status(dir==="en-ta"?"Listening again…":"மீண்டும் கேட்கிறது…");
-     }catch(e){
-       console.error(e);status("Free translation failed. The local model may still be downloading or your device may not have enough memory.");
-     }
-   }
-   clearTimeout(restartTimer);
-   restartTimer=setTimeout(()=>{if(running)createRecognition()},Math.max(900,speechSynthesis.speaking?1500:500));
- };
- try{rec.start()}catch(e){setTimeout(()=>{if(running)createRecognition()},700)}
-}
-function stop(){
- running=false;clearTimeout(restartTimer);try{rec?.stop()}catch(e){}rec=null;speechSynthesis.cancel();
- $("badge").textContent="READY";$("start").classList.remove("live");$("start").textContent="🎙️ Start interpreter";status("Stopped.");
-}
-$("start").onclick=start;
-$("replay").onclick=()=>speak(last,lastLang);
-$("clear").onclick=()=>{$("src").textContent="—";$("dst").textContent="—";last="";$("history").innerHTML='<div class="hint">Your conversation will appear here.</div>'};
-if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
-</script>
-</body>
-</html>
+YOU SAID
+—
+TRANSLATION
+—
+🔊 Replay
+⏭️ Skip turn
+Clear
+CONVERSATION
+Your conversation will appear here.
+V4 Conversation Mode: listens to one speaker, translates, speaks the result, waits for the speech to finish, then listens in the other language. This is turn-by-turn interpreting rather than simultaneous interpretation. Speech recognition requests en-IN/ta-IN; output prefers the corresponding Indian voices. Translation uses free browser/on-device technology. No OpenAI key or credit card.
